@@ -128,7 +128,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust-pangenome-red-black-tries"
+name = "rust-pangenome-vcf"
 version = "0.1.0"
 dependencies = [
  "clap",
