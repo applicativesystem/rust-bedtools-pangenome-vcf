@@ -1,6 +1,7 @@
 mod args;
 mod vcfprep;
 use crate::vcfprep::Common;
+use crate::vcfprep::Commonsnatcher;
 use crate::vcfprep::Endpointcompare;
 use crate::vcfprep::Fasta;
 use crate::vcfprep::Startpointcompare;
@@ -24,7 +25,10 @@ and this allows for the faster sorting of the keymaps based on the string.
 
 algorithmic implementation: to minimize the time comparsion, it first looks for the
 start or the end point and then tabulates the vcf snps so the difference of the length
-doesnt have to be calculated in real time.
+doesnt have to be calculated in real time. If there is a difference in the start or the
+end coordinate then will stash the stash coordinate, do a reverse slice and then will
+map the reverse slice iteration into a join vector. Even reports a single nucleotide
+based difference.
 
 */
 
@@ -139,7 +143,7 @@ fn vcf_compare(path1: &str, path2: &str) -> Result<String, Box<dyn Error>> {
                     threshold2: Box::new(*value.threshold),
                     difference: Box::new(j.end - value.end),
                 });
-            } else if j.end == value.end && value.start > j.start {
+            } else if j.start == value.start && value.end > j.end {
                 start_point_compare.push(Startpointcompare {
                     name: j.name.clone(),
                     start1: j.start,
@@ -180,44 +184,98 @@ fn vcf_compare(path1: &str, path2: &str) -> Result<String, Box<dyn Error>> {
         }
     }
 
+
     let fasta_unload: Vec<Fasta> = fasta_estimate().unwrap();
 
     let mut endpointsnatcher: Vec<Fastasnatcher> = Vec::new();
     let mut startpointsnatcher: Vec<Fastasnatcher> = Vec::new();
+    let mut commonpointvariant: Vec<Commonsnatcher> = Vec::new();
 
-    let mut endpointcompare = File::create("endpoint.txt").expect("file not present");
-    let mut startpointcompare = File::create("startpoint.txt").expect("file not present");
+    let mut endpointcompare = File::create("endpoint_variants.txt").expect("file not present");
+    let mut startpointcompare = File::create("startpoint_variants.txt").expect("file not present");
+    let mut common_point = File::create("common_variant.txt").expect("file not present");
+
+    for i in common_pangenome_variants.iter() {
+        for j in fasta_unload.iter() {
+            if i.name == j.header {
+                commonpointvariant.push(Commonsnatcher {
+                    name: i.name.clone(),
+                    start1: i.start1,
+                    end1: i.end1,
+                    start2: i.start2,
+                    end2: i.end2,
+                    deltype1: i.deltype1.clone(),
+                    delorig1: i.delorig1.clone(),
+                    deltype2: i.deltype2.clone(),
+                    delorig2: i.delorig2.clone(),
+                    threshold1: Box::new(i.threshold1),
+                    threshold2: Box::new(i.threshold2),
+                    sequenceregion1: j.sequence[i.start1..i.end1].to_string(),
+                    sequenceregion2: j.sequence[i.start2..i.end2].to_string(),
+                });
+            }
+        }
+    }
+
+    for i in commonpointvariant.iter() {
+        writeln!(
+            common_point,
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            i.name,
+            i.start1,
+            i.end1,
+            i.start2,
+            i.end2,
+            i.delorig1,
+            i.deltype1,
+            i.delorig2,
+            i.deltype2,
+            i.threshold1,
+            i.threshold2,
+            i.sequenceregion1,
+            i.sequenceregion2
+        )
+        .expect("file not present");
+    }
+
+    // implemented reverse slicing when the coorindate are not range compatible.
 
     for i in end_point_compare.iter() {
         for j in fasta_unload.iter() {
-            if i.name == j.header && i.start1 > i.start2 {
+            if i.name == j.header && i.end1 == i.end2 && i.start1 > i.start2 {
                 endpointsnatcher.push(Fastasnatcher {
                     name: i.name.clone(),
                     start1: i.start1,
                     end1: i.end1,
                     start2: i.start2,
                     end2: i.end2,
-                    deltype1: i.deltype1.clone(),
                     delorig1: i.delorig1.clone(),
-                    deltype2: i.deltype2.clone(),
+                    deltype1: i.deltype1.clone(),
                     delorig2: i.delorig2.clone(),
+                    deltype2: i.deltype2.clone(),
                     threshold1: i.threshold1.clone(),
                     threshold2: i.threshold2.clone(),
-                    sequenceadd: j.sequence[i.start2..i.start1].to_string(),
+                    sequenceadd: j.sequence[i.start2..i.start1]
+                        .to_string()
+                        .chars()
+                        .rev()
+                        .map(|x| String::from(x))
+                        .collect::<Vec<_>>()
+                        .join(""),
                     sequenceregion1: j.sequence[i.start1..i.end1].to_string(),
                     sequenceregion2: j.sequence[i.start2..i.end2].to_string(),
                 })
-            } else if i.name == j.header && i.start1 < i.start2 {
+            } else if i.name == j.header && i.end1 == i.end2 && i.start1 < i.start2 {
                 endpointsnatcher.push(Fastasnatcher {
                     name: i.name.clone(),
                     start1: i.start1,
                     end1: i.end1,
                     start2: i.start2,
                     end2: i.end2,
-                    deltype1: i.deltype1.clone(),
                     delorig1: i.delorig1.clone(),
-                    deltype2: i.deltype2.clone(),
+                    deltype1: i.deltype1.clone(),
                     delorig2: i.delorig2.clone(),
+                    deltype2: i.deltype2.clone(),
                     threshold1: i.threshold1.clone(),
                     threshold2: i.threshold2.clone(),
                     sequenceadd: j.sequence[i.start1..i.start2].to_string(),
@@ -228,9 +286,12 @@ fn vcf_compare(path1: &str, path2: &str) -> Result<String, Box<dyn Error>> {
         }
     }
 
+
+    // implemented the reverse slicing when the range parameters are not in the range.
+
     for i in start_point_compare.iter() {
         for j in fasta_unload.iter() {
-            if i.name == j.header && i.start1 > i.start2 {
+            if i.name == j.header && i.start1 == i.start2 && i.end1 > i.end2 {
                 startpointsnatcher.push(Fastasnatcher {
                     name: i.name.clone(),
                     start1: i.start1,
@@ -243,30 +304,37 @@ fn vcf_compare(path1: &str, path2: &str) -> Result<String, Box<dyn Error>> {
                     delorig2: i.delorig2.clone(),
                     threshold1: i.threshold1.clone(),
                     threshold2: i.threshold2.clone(),
-                    sequenceadd: j.sequence[i.start2..i.start1].to_string(),
+                    sequenceadd: j.sequence[i.end2..i.end1]
+                        .to_string()
+                        .chars()
+                        .rev()
+                        .map(|x| String::from(x))
+                        .collect::<Vec<_>>()
+                        .join(""),
                     sequenceregion1: j.sequence[i.start1..i.end1].to_string(),
                     sequenceregion2: j.sequence[i.start2..i.end2].to_string(),
                 })
-            } else if i.name == j.header && i.start1 < i.start2 {
+            } else if i.name == j.header && i.start1 == i.start2 && i.end1 < i.end2 {
                 startpointsnatcher.push(Fastasnatcher {
                     name: i.name.clone(),
                     start1: i.start1,
                     end1: i.end1,
                     start2: i.start2,
                     end2: i.end2,
-                    deltype1: i.deltype1.clone(),
                     delorig1: i.delorig1.clone(),
-                    deltype2: i.deltype2.clone(),
+                    deltype1: i.deltype1.clone(),
                     delorig2: i.delorig2.clone(),
+                    deltype2: i.deltype2.clone(),
                     threshold1: i.threshold1.clone(),
                     threshold2: i.threshold2.clone(),
-                    sequenceadd: j.sequence[i.start1..i.start2].to_string(),
+                    sequenceadd: j.sequence[i.end1..i.end2].to_string(),
                     sequenceregion1: j.sequence[i.start1..i.end1].to_string(),
                     sequenceregion2: j.sequence[i.start2..i.end2].to_string(),
                 })
             }
         }
     }
+
 
     for i in endpointsnatcher.iter() {
         writeln!(
@@ -277,10 +345,10 @@ fn vcf_compare(path1: &str, path2: &str) -> Result<String, Box<dyn Error>> {
             i.end1,
             i.start2,
             i.end2,
-            i.deltype1,
             i.delorig1,
-            i.deltype2,
+            i.deltype1,
             i.delorig2,
+            i.deltype2,
             i.sequenceadd,
             i.sequenceregion1,
             i.sequenceregion2
@@ -297,10 +365,10 @@ fn vcf_compare(path1: &str, path2: &str) -> Result<String, Box<dyn Error>> {
             i.end1,
             i.start2,
             i.end2,
-            i.deltype1,
             i.delorig1,
-            i.deltype2,
+            i.deltype1,
             i.delorig2,
+            i.deltype2,
             i.sequenceadd,
             i.sequenceregion1,
             i.sequenceregion2

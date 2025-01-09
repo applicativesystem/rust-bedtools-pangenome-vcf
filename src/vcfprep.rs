@@ -55,8 +55,8 @@ pub struct Common {
     pub end2: usize,
     pub delorig1: String,
     pub deltype1: String,
-    pub deltype2: String,
     pub delorig2: String,
+    pub deltype2: String,
     pub threshold1: f64,
     pub threshold2: f64,
 }
@@ -83,4 +83,22 @@ pub struct Fastasnatcher {
     pub sequenceadd: String,
     pub sequenceregion1: String,
     pub sequenceregion2: String,
+}
+
+#[derive(Debug, Clone, PartialOrd, PartialEq)]
+pub struct Commonsnatcher {
+    pub name: String,
+    pub start1: usize,
+    pub end1: usize,
+    pub start2: usize,
+    pub end2: usize,
+    pub delorig1: String,
+    pub deltype1: String,
+    pub threshold1: Box<f64>,
+    pub delorig2: String,
+    pub deltype2: String,
+    pub threshold2: Box<f64>,
+    pub sequenceregion1: String,
+    pub sequenceregion2: String,
+
 }
