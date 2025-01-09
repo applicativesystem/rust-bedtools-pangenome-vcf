@@ -30,11 +30,11 @@ doesnt have to be calculated in real time.
 
 fn main() {
     let args = VcfArgs::parse();
-    let output = vcf_compare(&args.vcf1, &args.vcf2, &args.fasta).unwrap();
+    let output = vcf_compare(&args.vcf1, &args.vcf2).unwrap();
     println!("Results have been written:{}", output);
 }
 
-fn vcf_compare(path1: &str, path2: &str, path3: &str) -> Result<String, Box<dyn Error>> {
+fn vcf_compare(path1: &str, path2: &str) -> Result<String, Box<dyn Error>> {
     let vcf1_open = File::open(path1).expect("file not found");
     let vcf2_open = File::open(path2).expect("file not found");
     let vcf1_read = BufReader::new(vcf1_open);
@@ -180,13 +180,13 @@ fn vcf_compare(path1: &str, path2: &str, path3: &str) -> Result<String, Box<dyn 
         }
     }
 
-    let fasta_unload: Vec<Fasta> = fasta_estimate(path3)?;
+    let fasta_unload: Vec<Fasta> = fasta_estimate().unwrap();
 
     let mut endpointsnatcher: Vec<Fastasnatcher> = Vec::new();
     let mut startpointsnatcher: Vec<Fastasnatcher> = Vec::new();
 
-    let endpointcompare = File::create("endpoint.txt").expect("file not present");
-    let startpointcompare = File::create("startpoint.txt").expect("file not present");
+    let mut endpointcompare = File::create("endpoint.txt").expect("file not present");
+    let mut startpointcompare = File::create("startpoint.txt").expect("file not present");
 
     for i in end_point_compare.iter() {
         for j in fasta_unload.iter() {
@@ -312,8 +312,9 @@ fn vcf_compare(path1: &str, path2: &str, path3: &str) -> Result<String, Box<dyn 
     Ok("VF file have been compared for the pangenomes".to_string())
 }
 
-fn fasta_estimate(path: &str) -> Result<Vec<Fasta>, Box<dyn Error>> {
-    let fastaopen = File::open(path).expect("file not present");
+fn fasta_estimate() -> Result<Vec<Fasta>, Box<dyn Error>> {
+    let argsparse = VcfArgs::parse();
+    let fastaopen = File::open(&argsparse.fasta).expect("file not present");
     let fastaread = BufReader::new(fastaopen);
     let mut fastaholder: Vec<Fasta> = Vec::new();
     let mut fastaheader: Vec<String> = Vec::new();
