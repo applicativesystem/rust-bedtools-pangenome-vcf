@@ -3,7 +3,7 @@
  - compares two pangenome vcf files and then outputs the comparison and also the additional region which was at the same stretch in the one pangenome but was not present in the other.
  - write down the fasta for the same.
  - similar to bedtools intersect for vcf but for pangenomes.
- - general note: Incase of Golang and RUST, please see the last commit message and if it says compiled binary then it is completed or else still in development version.
+ - please see the last commit message and if it says compiled binary then it is completed or else still in development version.
 
 
  ```
